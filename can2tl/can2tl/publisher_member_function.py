@@ -15,7 +15,6 @@
 import rclpy
 from rclpy.node import Node
 
-from std_msgs.msg import String
 from ros2_socketcan_msgs.msg import FdFrame
 
 class MinimalPublisher(Node):
@@ -32,9 +31,34 @@ class MinimalPublisher(Node):
         self.subscription  # prevent unused variable warning
 
     def listener_callback(self, msg):
-        self.publisher_.publish(msg)
-        self.get_logger().info('I heard: "%s"' % msg.data)
+        state = self.getState(msg.data)
+        intersectionId = self.getIntersectionId(msg.data)
+        trafficLightState = self.getTrafficLightState(msg.data)
+        trafficLightRemainSeconds = self.getTrafficLightRemainSeconds(msg.data)
+        counter = self.getCounter(msg.data)
+        
+        self.get_logger().info(f'state: {state}')
+        self.get_logger().info(f'intersectionId: {intersectionId}')
+        self.get_logger().info(f'trafficLightState: {trafficLightState}')
+        self.get_logger().info(f'trafficLightRemainSeconds: {trafficLightRemainSeconds}')
+        self.get_logger().info(f'counter: {counter}')
 
+        #self.publisher_.publish(msg)
+
+    def getState(self, data):
+        return data[0]
+
+    def getIntersectionId(self, data):
+        return data[3]
+
+    def getTrafficLightState(self, data):
+        return data[4]
+
+    def getTrafficLightRemainSeconds(self, data):
+        return (data[6] * 256 + data[5]) * 0.1
+
+    def getCounter(self, data):
+        return data[7]
 
 def main(args=None):
     rclpy.init(args=args)
