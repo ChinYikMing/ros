@@ -71,11 +71,13 @@ class MinimalPublisher(Node):
                 if trafficLightId != None: # assume each lane only has one traffic light
                     break
 
-        # if trafficLightId != None:
-            # trafficSignals = self.trafficSignalsGen(trafficLightId)
-        trafficSignals = self.trafficSignalsGen(400004)
-        self.publisher_.publish(trafficSignals)
-        print("pub")
+        if trafficLightId != None:
+            # print("trafficId", trafficLightId)
+            trafficSignals = self.trafficSignalsGen(trafficLightId)
+            self.publisher_.publish(trafficSignals)
+            # print("pub")
+        # trafficSignals = self.trafficSignalsGen(400004)
+        # self.publisher_.publish(trafficSignals)
         
         #self.get_logger().info(f'state: {state}')
         #self.get_logger().info(f'intersectionId: {intersectionId}')
@@ -89,8 +91,7 @@ class MinimalPublisher(Node):
             #print("elem_id:",elem.id, "laneId:", laneId)
             if elem.regulatoryElements != [] and elem.id == laneId:
                 tl = elem.regulatoryElements.pop()
-                tlId = tl.parameters["refers"].pop().id
-                print("match!!!")
+                tlId = tl.id
                 break
         return tlId
 
