@@ -20,9 +20,9 @@ from rclpy.node import Node
 from std_msgs.msg import Header
 from builtin_interfaces.msg import Time
 from ros2_socketcan_msgs.msg import FdFrame
-from autoware_auto_perception_msgs.msg import TrafficSignalArray
-from autoware_auto_perception_msgs.msg import TrafficLight
-from autoware_auto_perception_msgs.msg import TrafficSignal
+from autoware_perception_msgs.msg import TrafficSignalArray
+from autoware_perception_msgs.msg import TrafficSignalElement
+from autoware_perception_msgs.msg import TrafficSignal
 
 class MinimalPublisher(Node):
 
@@ -46,7 +46,7 @@ class MinimalPublisher(Node):
         trafficLightRemainSeconds = self.getTrafficLightRemainSeconds(msg.data)
         counter = self.getCounter(msg.data)
 
-        trafficSignals = self.trafficSignalsGen(120008)
+        trafficSignals = self.trafficSignalsGen(400004)
         self.publisher_.publish(trafficSignals)
         
         self.get_logger().info(f'state: {state}')
@@ -57,36 +57,34 @@ class MinimalPublisher(Node):
 
         #self.publisher_.publish(msg)
 
-    def headerGen(self, frame_id = ''):
-        hdr = Header()
-        hdr.stamp = Time()
-        #t = time.time()
-        #hdr.stamp.sec = int(t - math.floor(t))
+    def stampGen(self, frame_id = ''):
+        stamp = Time()
+        t = time.time()
+        stamp.sec = int(t - math.floor(t))
         #hdr.stamp.nanosec = int(math.floor((t - math.floor(t)) * 10000000))
-        hdr.stamp.sec = 1
-        hdr.stamp.nanosec = 2
-        hdr.frame_id = frame_id
-        return hdr
+        #hdr.stamp.sec = 1
+        stamp.nanosec = 2
+        return stamp
 
-    def trafficLightGen(self, state):
-        tl = TrafficLight()
-        tl.color = state[0]
-        tl.shape = state[1]
-        tl.status = state[2]
-        tl.confidence = state[3]
-        return tl
+    def trafficSigEleGen(self, state):
+        tse = TrafficSignalElement()
+        tse.color = state[0]
+        tse.shape = state[1]
+        tse.status = state[2]
+        tse.confidence = state[3]
+        return tse
 
     def trafficSignalGen(self, tl_id, state):
         ts = TrafficSignal()
-        ts.map_primitive_id = tl_id
-        ts.lights.append(self.trafficLightGen(state))
+        ts.traffic_signal_id = tl_id
+        ts.elements.append(self.trafficSigEleGen(state))
         return ts
 
     def trafficSignalsGen(self, tl_id, state = (1, 5, 16, 1.0)):
-        hdr = self.headerGen()
+        stamp = self.stampGen()
         ts = self.trafficSignalGen(tl_id, state)
         trafficSignals = TrafficSignalArray()
-        trafficSignals.header = hdr
+        trafficSignals.stamp = stamp
         trafficSignals.signals.append(ts)
         return trafficSignals
 
