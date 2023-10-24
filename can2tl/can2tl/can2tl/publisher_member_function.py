@@ -71,9 +71,29 @@ class MinimalPublisher(Node):
                 if trafficLightId != None: # assume each lane only has one traffic light
                     break
 
+        # we only need to check bit 2 - bit 7 for now
+        color = (3, 1, 2, 1.0)
+        trafficLightStateArr = [int(i) for i in "{0:08b}".format(trafficLightState)]
+        print(trafficLightStateArr)
+        #trafficLightStateArr.reverse() # after reversing, index x means bit x
+        if trafficLightStateArr[0]:   # general red
+            color = (1, 1, 2, 1.0)
+        elif trafficLightStateArr[1]: # general yellow
+            color = (2, 1, 2, 1.0)
+        elif trafficLightStateArr[2]: # general green
+            color = (3, 1, 2, 1.0)
+        elif trafficLightStateArr[3]: # left green
+            color = (3, 2, 2, 1.0)
+        elif trafficLightStateArr[4]: # straight green
+            color = (3, 4, 2, 1.0)
+        elif trafficLightStateArr[5]: # right green
+            color = (3, 3, 2, 1.0)
+        #elif trafficLightStateArr[6]: # crosswalk green(reserved)
+        #elif trafficLightStateArr[7]: # crosswalk red(reserved)
+
         if trafficLightId != None:
             # print("trafficId", trafficLightId)
-            trafficSignals = self.trafficSignalsGen(trafficLightId)
+            trafficSignals = self.trafficSignalsGen(trafficLightId, color)
             self.publisher_.publish(trafficSignals)
             # print("pub")
         # trafficSignals = self.trafficSignalsGen(400004)
@@ -120,7 +140,7 @@ class MinimalPublisher(Node):
         ts.elements.append(self.trafficSigEleGen(state))
         return ts
 
-    def trafficSignalsGen(self, tl_id, state = (1, 1, 2, 1.0)):
+    def trafficSignalsGen(self, tl_id, state = (3, 1, 2, 1.0)):
         stamp = self.stampGen()
         ts = self.trafficSignalGen(tl_id, state)
         trafficSignals = TrafficSignalArray()
