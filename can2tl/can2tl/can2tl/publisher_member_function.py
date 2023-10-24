@@ -71,9 +71,9 @@ class MinimalPublisher(Node):
                 if trafficLightId != None: # assume each lane only has one traffic light
                     break
 
-        #if trafficLightId != None:
+        # if trafficLightId != None:
+            # trafficSignals = self.trafficSignalsGen(trafficLightId)
         trafficSignals = self.trafficSignalsGen(400004)
-        #trafficSignals = self.trafficSignalsGen(400004)
         self.publisher_.publish(trafficSignals)
         print("pub")
         
@@ -96,12 +96,13 @@ class MinimalPublisher(Node):
 
     def stampGen(self, frame_id = ''):
         stamp = Time()
-        t = time.time()
+        t = self.get_clock().now()
+        stamp = t.to_msg()
         #stamp.sec = int(t - math.floor(t))
         #hdr.stamp.nanosec = int(math.floor((t - math.floor(t)) * 10000000))
         #hdr.stamp.sec = 1
-        stamp.sec = int(t)
-        stamp.nanosec = 0
+        # stamp.sec = int(t)
+        # stamp.nanosec = 0
         return stamp
 
     def trafficSigEleGen(self, state):
