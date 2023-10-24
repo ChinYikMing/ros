@@ -10,6 +10,7 @@
   <exec_depend>rclpy</exec_depend>
   <exec_depend>builtin_interfaces</exec_depend>
   <exec_depend>std_msgs</exec_depend>
+  <exec_depend>can_msgs</exec_depend>
   <exec_depend>ros2_socketcan_msgs</exec_depend>
   <exec_depend>autoware_auto_perception_msgs</exec_depend>
 

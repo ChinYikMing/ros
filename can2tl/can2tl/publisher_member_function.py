@@ -16,54 +16,115 @@ import math
 import time
 import rclpy
 from rclpy.node import Node
+import lanelet2
 
 from std_msgs.msg import Header
 from builtin_interfaces.msg import Time
-from ros2_socketcan_msgs.msg import FdFrame
+# from ros2_socketcan_msgs.msg import FdFrame
 from autoware_perception_msgs.msg import TrafficSignalArray
 from autoware_perception_msgs.msg import TrafficSignalElement
+from can_msgs.msg import Frame
 from autoware_perception_msgs.msg import TrafficSignal
+from autoware_auto_planning_msgs.msg import PathWithLaneId
 
 class MinimalPublisher(Node):
+    lane_ids = None
+    osmMap = None
 
     def __init__(self):
         super().__init__('minimal_publisher')
+        self.osmMap = lanelet2.io.load("/home/chinyikming/ARTC/ARTC-map-project-2023/ARTC-data/lanelet2/ARTC.osm", lanelet2.io.Origin(0,0))
         #autoware launch file already setup topic: /perception/traffic_light_recognition/traffic_signals, so we can just reuse it
-        self.publisher_ = self.create_publisher(TrafficSignalArray, 'perception/traffic_light_recognition/traffic_signals', 0) 
+        self.publisher_ = self.create_publisher(
+            TrafficSignalArray, 
+            'perception/traffic_light_recognition/traffic_signals', 
+            1) 
         timer_period = 0.1  # 0.1 seconds = 10Hz
-        self.subscription = self.create_subscription(
-            FdFrame,
-            'canData',
-            self.listener_callback,
+        self.canSub = self.create_subscription(
+            Frame,
+            'from_can_bus',
+            self.canSub_listener_callback,
             0)
+        self.laneSub = self.create_subscription(
+            PathWithLaneId,
+            'planning/scenario_planning/lane_driving/behavior_planning/path_with_lane_id',
+            self.laneSub_listener_callback,
+            0) # assume the lane has decent distance for buffering
         #self.timer = self.create_timer(timer_period, self.listener_callback)
-        self.subscription  # prevent unused variable warning
+        self.canSub  # prevent unused variable warning
+        self.laneSub  # prevent unused variable warning
 
-    def listener_callback(self, msg):
+    def laneSub_listener_callback(self, msg):
+        self.lane_ids = msg.points[0].lane_ids
+        #print(self.lane_ids)
+
+    def canSub_listener_callback(self, msg):
         state = self.getState(msg.data)
         intersectionId = self.getIntersectionId(msg.data)
         trafficLightState = self.getTrafficLightState(msg.data)
         trafficLightRemainSeconds = self.getTrafficLightRemainSeconds(msg.data)
         counter = self.getCounter(msg.data)
 
-        trafficSignals = self.trafficSignalsGen(400004)
-        self.publisher_.publish(trafficSignals)
-        
-        self.get_logger().info(f'state: {state}')
-        self.get_logger().info(f'intersectionId: {intersectionId}')
-        self.get_logger().info(f'trafficLightState: {trafficLightState}')
-        self.get_logger().info(f'trafficLightRemainSeconds: {trafficLightRemainSeconds}')
-        self.get_logger().info(f'counter: {counter}')
+        trafficLightId = None
+        if self.osmMap != None and self.lane_ids != None:
+            for lane_id in self.lane_ids:
+                trafficLightId = self.getTrafficLightId(lane_id)
+                if trafficLightId != None: # assume each lane only has one traffic light
+                    break
 
-        #self.publisher_.publish(msg)
+        # we only need to check bit 2 - bit 7 for now
+        color = (3, 1, 2, 1.0)
+        trafficLightStateArr = [int(i) for i in "{0:08b}".format(trafficLightState)]
+        print(trafficLightStateArr)
+        #trafficLightStateArr.reverse() # after reversing, index x means bit x
+        if trafficLightStateArr[0]:   # general red
+            color = (1, 1, 2, 1.0)
+        elif trafficLightStateArr[1]: # general yellow
+            color = (2, 1, 2, 1.0)
+        elif trafficLightStateArr[2]: # general green
+            color = (3, 1, 2, 1.0)
+        elif trafficLightStateArr[3]: # left green
+            color = (3, 2, 2, 1.0)
+        elif trafficLightStateArr[4]: # straight green
+            color = (3, 4, 2, 1.0)
+        elif trafficLightStateArr[5]: # right green
+            color = (3, 3, 2, 1.0)
+        #elif trafficLightStateArr[6]: # crosswalk green(reserved)
+        #elif trafficLightStateArr[7]: # crosswalk red(reserved)
+
+        if trafficLightId != None:
+            # print("trafficId", trafficLightId)
+            trafficSignals = self.trafficSignalsGen(trafficLightId, color)
+            self.publisher_.publish(trafficSignals)
+            # print("pub")
+        # trafficSignals = self.trafficSignalsGen(400004)
+        # self.publisher_.publish(trafficSignals)
+        
+        #self.get_logger().info(f'state: {state}')
+        #self.get_logger().info(f'intersectionId: {intersectionId}')
+        #self.get_logger().info(f'trafficLightState: {trafficLightState}')
+        #self.get_logger().info(f'trafficLightRemainSeconds: {trafficLightRemainSeconds}')
+        #self.get_logger().info(f'counter: {counter}')
+
+    def getTrafficLightId(self, laneId):
+        tlId = None
+        for elem in self.osmMap.laneletLayer:
+            #print("elem_id:",elem.id, "laneId:", laneId)
+            if elem.regulatoryElements != [] and elem.id == laneId:
+                tl = elem.regulatoryElements.pop()
+                tlId = tl.id
+                break
+        return tlId
 
     def stampGen(self, frame_id = ''):
         stamp = Time()
-        t = time.time()
-        stamp.sec = int(t - math.floor(t))
+        t = self.get_clock().now()
+        stamp = t.to_msg()
+        #stamp.sec = int(t - math.floor(t))
         #hdr.stamp.nanosec = int(math.floor((t - math.floor(t)) * 10000000))
         #hdr.stamp.sec = 1
-        stamp.nanosec = 2
+        # stamp.sec = int(t)
+        # stamp.nanosec = 0
         return stamp
 
     def trafficSigEleGen(self, state):
@@ -80,7 +141,7 @@ class MinimalPublisher(Node):
         ts.elements.append(self.trafficSigEleGen(state))
         return ts
 
-    def trafficSignalsGen(self, tl_id, state = (1, 5, 16, 1.0)):
+    def trafficSignalsGen(self, tl_id, state = (3, 1, 2, 1.0)):
         stamp = self.stampGen()
         ts = self.trafficSignalGen(tl_id, state)
         trafficSignals = TrafficSignalArray()
